@@ -38,3 +38,4 @@
 2026-04-04T09:11:01  feat: do or do not, there is no try/except
 2024-06-13T08:12:12  refactor(engine): add a regression fixture
 2024-07-06T15:29:19  ci(mcp): handle empty and malformed input
+2024-07-12T10:46:26  build(detect): improve error messages with context
