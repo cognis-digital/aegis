@@ -39,3 +39,4 @@
 2024-06-13T08:12:12  refactor(engine): add a regression fixture
 2024-07-06T15:29:19  ci(mcp): handle empty and malformed input
 2024-07-12T10:46:26  build(detect): improve error messages with context
+2024-08-06T17:03:33  docs(io): fix off-by-one in line numbers
