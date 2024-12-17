@@ -46,3 +46,4 @@
 2024-10-22T09:11:01  docs(config): normalize unicode before matching
 2024-10-29T16:28:08  refactor(ci): respect .gitignore when walking
 2024-11-22T11:45:15  ci(core): extract the scorer
+2024-12-17T18:02:22  build(rules): add a --format json alias
