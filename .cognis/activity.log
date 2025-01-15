@@ -48,3 +48,4 @@
 2024-11-22T11:45:15  ci(core): extract the scorer
 2024-12-17T18:02:22  build(rules): add a --format json alias
 2024-12-22T13:19:29  docs(docs): document the config keys
+2025-01-15T08:36:36  refactor(scan): memoize repeated lookups
