@@ -55,3 +55,4 @@
 2025-04-04T12:44:04  refactor(scoring): stream large files without buffering
 2025-04-10T19:01:11  ci(output): add pagination to large reports
 2025-05-04T14:18:18  build(tests): handle CRLF line endings
+2025-05-28T09:35:25  docs(cache): add color + severity icons
