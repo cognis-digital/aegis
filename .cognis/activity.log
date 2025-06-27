@@ -57,3 +57,4 @@
 2025-05-04T14:18:18  build(tests): handle CRLF line endings
 2025-05-28T09:35:25  docs(cache): add color + severity icons
 2025-06-04T16:52:32  refactor(core): add a regression fixture
+2025-06-27T11:09:39  ci(ci): handle empty and malformed input
