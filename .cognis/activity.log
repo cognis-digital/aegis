@@ -14,3 +14,4 @@
 2025-04-23T15:53:43  docs: clarify usage notes
 2025-05-10T10:10:50  test: add edge case
 2025-06-04T17:27:57  refactor: tidy internals
+2025-06-28T12:44:04  fix: handle empty input gracefully
