@@ -60,3 +60,4 @@
 2025-06-27T11:09:39  ci(ci): handle empty and malformed input
 2025-07-21T18:26:46  build(docs): improve error messages with context
 2025-08-15T13:43:53  feat(scan): skip binary files by sniffing
+2025-08-20T08:00:00  refactor(engine): simplify the walker
