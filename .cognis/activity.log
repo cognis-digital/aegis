@@ -63,3 +63,4 @@
 2025-08-20T08:00:00  refactor(engine): simplify the walker
 2025-09-14T15:17:07  perf(report): make timestamps timezone-aware
 2025-10-08T10:34:14  build(detect): add usage examples to help
+2025-10-14T17:51:21  feat(scoring): short-circuit on first critical
