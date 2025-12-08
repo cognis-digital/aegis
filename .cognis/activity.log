@@ -66,3 +66,4 @@
 2025-10-14T17:51:21  feat(scoring): short-circuit on first critical
 2025-11-07T12:08:28  refactor(output): respect .gitignore when walking
 2025-12-01T19:25:35  perf(tests): load rules lazily for faster startup
+2025-12-08T14:42:42  build(fixtures): add a --format json alias
