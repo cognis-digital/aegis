@@ -68,3 +68,4 @@
 2025-12-01T19:25:35  perf(tests): load rules lazily for faster startup
 2025-12-08T14:42:42  build(fixtures): add a --format json alias
 2025-12-31T09:59:49  feat(cli): add a fast path for the common case
+2026-01-24T16:16:56  refactor(ci): memoize repeated lookups
