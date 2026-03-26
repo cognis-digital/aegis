@@ -72,3 +72,4 @@
 2026-01-31T11:33:03  perf(docs): trim whitespace in parsed fields
 2026-02-24T18:50:10  build(rules): guard against ReDoS in patterns
 2026-03-20T13:07:17  feat(engine): cover the multiline case
+2026-03-26T08:24:24  refactor(scan): stream large files without buffering
