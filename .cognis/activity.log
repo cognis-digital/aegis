@@ -73,3 +73,4 @@
 2026-02-24T18:50:10  build(rules): guard against ReDoS in patterns
 2026-03-20T13:07:17  feat(engine): cover the multiline case
 2026-03-26T08:24:24  refactor(scan): stream large files without buffering
+2026-04-19T15:41:31  perf(format): support stdin as a source
