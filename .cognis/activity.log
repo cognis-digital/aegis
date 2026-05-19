@@ -75,3 +75,4 @@
 2026-03-26T08:24:24  refactor(scan): stream large files without buffering
 2026-04-19T15:41:31  perf(format): support stdin as a source
 2026-05-13T10:58:38  build(io): handle CRLF line endings
+2026-05-19T17:15:45  feat(output): bump the dev toolchain
