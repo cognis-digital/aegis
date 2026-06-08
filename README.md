@@ -36,7 +36,10 @@ AI Agent Permission & Access Auditor — surfaces the lethal trifecta of credent
 <a name="features"></a>
 ## Features
 
-- ✅ Scan
+- ✅ Classify Capability
+- ✅ Load Manifest
+- ✅ Audit Manifest
+- ✅ Audit File
 - ✅ Runs on Linux/macOS/Windows · Docker · devcontainer
 - ✅ Ports in Python, JavaScript, Go, and Rust (`ports/`)
 
