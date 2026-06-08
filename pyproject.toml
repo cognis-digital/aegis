@@ -7,14 +7,14 @@ name = "cognis-aegis"
 version = "0.1.0"
 description = "AEGIS — AI Agent Permission & Access Auditor. Static auditor for MCP, LangChain, LlamaIndex, OpenAI Assistants, CrewAI, and AutoGen agents."
 authors = [{name = "Cognis Digital", email = "suite@cognis.digital"}]
-license = {text = "MIT"}
+license = {text = "LicenseRef-COCL-1.0"}
 requires-python = ">=3.10"
 readme = "README.md"
 keywords = ["ai-security", "mcp", "langchain", "agent-security", "owasp-llm", "prompt-injection", "cognis-digital", "cognis-neural-suite"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Information Technology",
-    "License :: OSI Approved :: MIT License",
+    "License :: Other/Proprietary License",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
