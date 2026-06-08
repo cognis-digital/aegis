@@ -120,7 +120,17 @@ Pipes into your stack: **SARIF** for code-scanning, **JSON** for anything, an **
 <div align="right"><a href="#top">↑ back to top</a></div>
 
 <a name="install-anywhere"></a>
-## Install anywhere
+## Install — every way, every platform
+
+```bash
+pip install "git+https://github.com/cognis-digital/aegis.git"    # pip (works today)
+pipx install "git+https://github.com/cognis-digital/aegis.git"   # isolated CLI
+uv tool install "git+https://github.com/cognis-digital/aegis.git" # uv
+pip install cognis-aegis                                          # PyPI (when published)
+docker run --rm ghcr.io/cognis-digital/aegis:latest --help        # Docker
+brew install cognis-digital/tap/aegis                             # Homebrew tap
+curl -fsSL https://raw.githubusercontent.com/cognis-digital/aegis/main/install.sh | sh
+```
 
 | Linux | macOS | Windows | Docker | Cloud |
 |---|---|---|---|---|
