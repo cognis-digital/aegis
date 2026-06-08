@@ -1,0 +1,66 @@
+{
+  "agents": [
+    {
+      "name": "support-bot",
+      "description": "Answers customer support tickets",
+      "capabilities": [
+        {
+          "name": "read_email",
+          "description": "Read incoming customer emails from the support inbox",
+          "scopes": ["read:email"]
+        },
+        {
+          "name": "billing_db_query",
+          "description": "Look up customer billing and payment records",
+          "scopes": ["read:db"]
+        },
+        {
+          "name": "send_email",
+          "description": "Send a reply email to the customer",
+          "scopes": ["send:email"]
+        }
+      ]
+    },
+    {
+      "name": "deploy-agent",
+      "description": "Triages GitHub issues and ships fixes",
+      "capabilities": [
+        {
+          "name": "read_issue_comment",
+          "description": "Read comments on a GitHub issue or ticket"
+        },
+        {
+          "name": "run_deploy",
+          "description": "Execute deploy shell command in production",
+          "scopes": ["exec:shell"]
+        }
+      ]
+    },
+    {
+      "name": "summarizer",
+      "description": "Summarizes articles from the web",
+      "capabilities": [
+        {
+          "name": "web_fetch",
+          "description": "Fetch and parse a web page URL",
+          "scopes": ["read:web"]
+        },
+        {
+          "name": "write_summary_file",
+          "description": "Write the summary to a local file",
+          "scopes": ["write:files"]
+        }
+      ]
+    },
+    {
+      "name": "calculator",
+      "description": "Does arithmetic",
+      "capabilities": [
+        {
+          "name": "compute",
+          "description": "Evaluate a math expression"
+        }
+      ]
+    }
+  ]
+}

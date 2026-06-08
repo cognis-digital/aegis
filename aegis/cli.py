@@ -1,110 +1,104 @@
-"""AEGIS command-line interface."""
+"""Command-line interface for AEGIS."""
+
 from __future__ import annotations
 
 import argparse
+import json
 import sys
-from pathlib import Path
 
-from aegis import __version__
-from aegis.core import scan
-from aegis.exporters import to_console, to_json, to_sarif, to_html, to_markdown
+from . import TOOL_NAME, TOOL_VERSION
+from .core import audit_file, AuditReport
+
+_SEV_LABEL = {
+    "critical": "CRIT",
+    "high": "HIGH",
+    "medium": "MED ",
+    "low": "LOW ",
+}
 
 
-SEVERITY_ORDER = {"info": 4, "low": 3, "medium": 2, "high": 1, "critical": 0}
-
-
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(
-        prog="aegis",
-        description="AEGIS — AI Agent Permission & Access Auditor (Cognis Neural Suite)",
+def _render_table(report: AuditReport) -> str:
+    lines: list[str] = []
+    lines.append(
+        f"AEGIS audit  |  agents scanned: {report.agents_scanned}  "
+        f"|  findings: {len(report.findings)}  "
+        f"|  worst: {report.worst_severity or 'none'}"
     )
-    parser.add_argument("--version", action="version", version=f"aegis {__version__}")
-    sub = parser.add_subparsers(dest="cmd")
+    lines.append("-" * 72)
+    if not report.findings:
+        lines.append("No trifecta exposure found. Agents are within safe bounds.")
+        return "\n".join(lines)
+    for f in report.findings:
+        lines.append(f"[{_SEV_LABEL.get(f.severity, f.severity)}] {f.agent}: {f.title}")
+        lines.append(f"        axes: {', '.join(f.axes)}")
+        for axis, caps in f.capabilities.items():
+            lines.append(f"        {axis:<12} <- {', '.join(caps)}")
+        lines.append(f"        fix: {f.detail}")
+        lines.append("")
+    return "\n".join(lines).rstrip()
 
-    p_scan = sub.add_parser("scan", help="Scan an agent project")
-    p_scan.add_argument("target", help="Path to project root or file")
-    p_scan.add_argument("--format", "-f", choices=["console", "json", "sarif", "html", "markdown"],
-                        default="console")
-    p_scan.add_argument("--out", "-o", help="Output file (default: stdout)")
-    p_scan.add_argument("--fail-on", choices=["critical", "high", "medium", "low"], default=None,
-                        help="Exit non-zero if any finding at or above this severity")
 
-    p_serve = sub.add_parser("serve", help="Run AEGIS web dashboard")
-    p_serve.add_argument("--port", type=int, default=8000)
-    p_serve.add_argument("--host", default="127.0.0.1")
+def _render_json(report: AuditReport) -> str:
+    return json.dumps(report.to_dict(), indent=2)
 
-    p_mcp = sub.add_parser("mcp", help="Run as MCP server (for Cognis.Studio integration)")
-    p_mcp.add_argument("--transport", choices=["stdio", "http"], default="stdio")
 
-    sub.add_parser("version", help="Print version")
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog=TOOL_NAME,
+        description=(
+            "AEGIS - AI Agent Permission & Access Auditor. Detects the lethal "
+            "trifecta (credentials + untrusted input + external reach) that "
+            "makes an AI agent exploitable by prompt injection."
+        ),
+    )
+    parser.add_argument(
+        "--version", action="version", version=f"{TOOL_NAME} {TOOL_VERSION}"
+    )
+    sub = parser.add_subparsers(dest="command")
 
+    audit = sub.add_parser(
+        "audit",
+        help="Audit an agent manifest (JSON) for trifecta exposure.",
+        description="Scan an agent manifest and report dangerous capability combinations.",
+    )
+    audit.add_argument("manifest", help="Path to agent manifest JSON file.")
+    audit.add_argument(
+        "--format",
+        choices=("table", "json"),
+        default="table",
+        help="Output format (default: table).",
+    )
+    return parser
+
+
+def main(argv=None) -> int:
+    parser = build_parser()
     args = parser.parse_args(argv)
 
-    if args.cmd in (None, "version"):
-        print(f"aegis {__version__}")
+    if args.command != "audit":
+        parser.print_help()
         return 0
 
-    if args.cmd == "scan":
-        return _do_scan(args)
+    try:
+        report = audit_file(args.manifest)
+    except FileNotFoundError:
+        print(f"aegis: manifest not found: {args.manifest}", file=sys.stderr)
+        return 2
+    except (ValueError, json.JSONDecodeError) as exc:
+        print(f"aegis: invalid manifest: {exc}", file=sys.stderr)
+        return 2
 
-    if args.cmd == "serve":
-        return _do_serve(args)
-
-    if args.cmd == "mcp":
-        return _do_mcp(args)
-
-    parser.print_help()
-    return 1
-
-
-def _do_scan(args) -> int:
-    result = scan(args.target)
-
-    formatters = {
-        "console": to_console,
-        "json": to_json,
-        "sarif": to_sarif,
-        "html": to_html,
-        "markdown": to_markdown,
-    }
-    output = formatters[args.format](result)
-
-    if args.out:
-        Path(args.out).write_text(output, encoding="utf-8")
-        print(f"[AEGIS] Wrote {args.out}", file=sys.stderr)
+    if args.format == "json":
+        print(_render_json(report))
     else:
-        print(output)
+        print(_render_table(report))
 
-    if args.fail_on:
-        threshold = SEVERITY_ORDER[args.fail_on]
-        for f in result.all_findings():
-            if SEVERITY_ORDER.get(f.severity, 99) <= threshold:
-                return 1
-
-    return 0
-
-
-def _do_serve(args) -> int:
-    try:
-        import uvicorn
-        from aegis.web import app
-    except ImportError:
-        print("Install with: pip install 'cognis-aegis[web]'", file=sys.stderr)
+    # Non-zero exit when any trifecta/critical exposure is found, so AEGIS can
+    # gate CI pipelines.
+    if any(f.severity in ("critical", "high") for f in report.findings):
         return 1
-    print(f"[AEGIS] Web dashboard: http://{args.host}:{args.port}")
-    uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
-    return 0
-
-
-def _do_mcp(args) -> int:
-    try:
-        from aegis.mcp_server import run_mcp_server
-    except ImportError:
-        print("Install with: pip install 'cognis-aegis[mcp]'", file=sys.stderr)
-        return 1
-    run_mcp_server(transport=args.transport)
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

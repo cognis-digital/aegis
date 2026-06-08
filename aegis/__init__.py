@@ -1,25 +1,34 @@
-"""
-AEGIS — AI Agent Permission & Access Auditor
-Part of the Cognis Neural Suite by Cognis Digital
-https://cognis.digital · MIT License
-"""
-from aegis.models import Agent, Tool, Finding, ScanResult, ReachProfile
-from aegis.core import scan
-from aegis.scoring import score, detect_lethal_trifecta, RISK_LEVELS
+"""AEGIS - AI Agent Permission & Access Auditor.
 
-__version__ = "0.1.0"
-__author__ = "Cognis Digital"
-__license__ = "MIT"
+Surfaces the "lethal trifecta" of agent risk:
+  1. CREDENTIALS  - access to secrets / sensitive data
+  2. INJECTION    - exposure to untrusted / attacker-controllable input
+  3. REACH        - ability to exfiltrate or act on the outside world
+
+An agent with all three is one prompt injection away from a breach.
+"""
+
+from .core import (
+    Finding,
+    AuditReport,
+    audit_manifest,
+    audit_file,
+    load_manifest,
+    classify_capability,
+    CAPABILITY_AXES,
+)
+
+TOOL_NAME = "aegis"
+TOOL_VERSION = "1.0.0"
 
 __all__ = [
-    "scan",
-    "score",
-    "detect_lethal_trifecta",
-    "Agent",
-    "Tool",
     "Finding",
-    "ScanResult",
-    "ReachProfile",
-    "RISK_LEVELS",
-    "__version__",
+    "AuditReport",
+    "audit_manifest",
+    "audit_file",
+    "load_manifest",
+    "classify_capability",
+    "CAPABILITY_AXES",
+    "TOOL_NAME",
+    "TOOL_VERSION",
 ]
