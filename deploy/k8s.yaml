@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: aegis, labels: { app: aegis } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: aegis } }
+  template:
+    metadata: { labels: { app: aegis } }
+    spec:
+      containers:
+        - name: aegis
+          image: ghcr.io/cognis-digital/aegis:latest
+          ports: [{ containerPort: 8000 }]
+          resources:
+            requests: { cpu: "50m", memory: "64Mi" }
+            limits: { cpu: "500m", memory: "256Mi" }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: aegis }
+spec:
+  selector: { app: aegis }
+  ports: [{ port: 80, targetPort: 8000 }]
