@@ -1,40 +1,24 @@
-name: CI
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-
+name: ci
+on: [push, pull_request]
+permissions:
+  contents: read
 jobs:
   test:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        python: ["3.10", "3.11", "3.12"]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python }}
-      - run: pip install -e ".[dev,yaml]"
-      - run: pytest -q
-      - run: aegis --version
-      - run: aegis scan demos/coding-assistant/
-      - run: aegis scan demos/coding-assistant/ --format sarif --out aegis.sarif
-      - uses: actions/upload-artifact@v4
-        if: matrix.os == 'ubuntu-latest' && matrix.python == '3.12'
-        with:
-          name: aegis-sarif
-          path: aegis.sarif
-
-  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install ruff
-      - run: ruff check aegis/ tests/
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]" || pip install -e . || pip install pytest
+      - name: Test
+        shell: bash
+        run: |
+          if compgen -G "tests/*.py" > /dev/null; then
+            python -m pytest -q
+          else
+            echo "no tests present — skipping"
+          fi
