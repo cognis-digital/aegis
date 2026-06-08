@@ -1,0 +1,7 @@
+{
+  "name":"analytics-agent",
+  "transport":"stdio",
+  "auth":"oauth2",
+  "capabilities":{"tools":{"list":true}},
+  "tools":[{"name":"sql_query_readonly","description":"Run a read-only SQL query against the analytics warehouse"}]
+}

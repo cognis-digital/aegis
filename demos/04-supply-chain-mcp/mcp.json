@@ -1,0 +1,7 @@
+{
+  "name":"procurement-agent",
+  "transport":"http",
+  "auth":"none",
+  "capabilities":{"tools":{"list":true,"call":true},"resources":{"read":true,"write":true}},
+  "tools":[{"name":"create_po","description":"Create purchase order with vendor name and amount"},{"name":"approve_payment","description":"Approve a vendor payment"}]
+}

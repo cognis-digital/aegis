@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "zendesk": {
+      "command": "npx",
+      "args": ["-y", "mcp-server-zendesk"],
+      "env": {
+        "ZENDESK_TOKEN": "sk-DEMOTOKEN12345678901234567890",
+        "ZENDESK_DOMAIN": "acme.zendesk.com"
+      }
+    },
+    "stripe": {
+      "command": "npx",
+      "args": ["-y", "mcp-server-stripe"],
+      "env": {
+        "STRIPE_SECRET_KEY": "sk_live_REDACTED_EXAMPLE_NOT_A_REAL_KEY"
+      }
+    }
+  }
+}
