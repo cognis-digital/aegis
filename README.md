@@ -16,7 +16,7 @@
 </div>
 
 ```bash
-pip install cognis-aegis
+pip install "git+https://github.com/cognis-digital/aegis.git"
 aegis scan .            # → prioritized findings in seconds
 ```
 
@@ -49,7 +49,7 @@ AI Agent Permission & Access Auditor — surfaces the lethal trifecta of credent
 ## Quick start
 
 ```bash
-pip install cognis-aegis
+pip install "git+https://github.com/cognis-digital/aegis.git"
 aegis --version
 aegis scan .                       # scan current project
 aegis scan . --format json         # machine-readable

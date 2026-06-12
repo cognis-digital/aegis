@@ -1,7 +1,6 @@
 """End-to-end tests against the demo targets."""
 from pathlib import Path
 
-import pytest
 
 from aegis.core import scan
 from aegis.scoring import score, detect_lethal_trifecta

@@ -1,5 +1,4 @@
 """Internal analytics agent — uses env vars + secret manager."""
-import os
 from openai import OpenAI
 
 client = OpenAI()  # reads OPENAI_API_KEY from env

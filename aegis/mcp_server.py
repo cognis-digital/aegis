@@ -10,7 +10,6 @@ Or register in Claude Desktop config:
 """
 from __future__ import annotations
 
-import json
 from typing import Any
 
 try:
@@ -20,7 +19,6 @@ try:
 except ImportError:
     raise ImportError("Install with: pip install 'cognis-aegis[mcp]'")
 
-from aegis import __version__
 from aegis.core import scan
 from aegis.exporters import to_json, to_markdown
 

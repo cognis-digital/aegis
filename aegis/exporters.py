@@ -4,7 +4,6 @@ from __future__ import annotations
 import dataclasses
 import html
 import json
-from pathlib import Path
 
 from aegis.models import ScanResult
 
