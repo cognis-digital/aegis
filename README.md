@@ -20,6 +20,29 @@ pip install cognis-aegis
 aegis scan .            # → prioritized findings in seconds
 ```
 
+## Usage — step by step
+
+`aegis` scans an AI-agent manifest (JSON) for the *lethal trifecta* — credentials + untrusted input + external reach — that makes an agent exploitable by prompt injection.
+
+1. **Install** (Python 3.10+):
+   ```bash
+   pip install -e .            # or: pipx install aegis
+   ```
+2. **Audit an agent manifest** (human-readable table):
+   ```bash
+   aegis audit demos/01-basic/agent.json
+   ```
+3. **Read the output** as JSON (findings, axes, per-axis capabilities, fixes):
+   ```bash
+   aegis audit manifest.json --format json | jq '.findings'
+   ```
+4. **Interpret the verdict** — each finding names the dangerous capability combination and a remediation; the header reports the worst severity.
+5. **Gate CI on trifecta exposure** — exit `1` when any `critical`/`high` finding is present, `0` otherwise, `2` on invalid manifest:
+   ```yaml
+   - run: pip install -e . && aegis audit manifest.json   # non-zero fails the job
+   ```
+
+
 ## Contents
 
 - [Why aegis?](#why) · [Features](#features) · [Quick start](#quick-start) · [Example](#example) · [Architecture](#architecture) · [AI stack](#ai-stack) · [How it compares](#how-it-compares) · [Integrations](#integrations) · [Install anywhere](#install-anywhere) · [Related](#related) · [Contributing](#contributing)
