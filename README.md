@@ -20,6 +20,12 @@ pip install "git+https://github.com/cognis-digital/aegis.git"
 aegis scan .            # → prioritized findings in seconds
 ```
 
+<!-- cognis:layman:start -->
+## What is this?
+
+AEGIS checks your AI agent code for a specific dangerous pattern: when an agent can read private or sensitive data, accept instructions from untrusted outside sources (like websites or emails), and also take actions in the real world (like sending emails or running commands) — all at once. This combination means a single hidden malicious instruction buried in a webpage or document could trick your agent into leaking your secrets to an attacker. It works by scanning your project files and flagging agents that have all three of these risky capabilities together, giving you a risk score and specific advice on what to fix. It is built for developers and security teams who are building or reviewing AI-powered applications and want a quick, no-setup check before shipping.
+<!-- cognis:layman:end -->
+
 ## Contents
 
 - [Why aegis?](#why) · [Features](#features) · [Quick start](#quick-start) · [Example](#example) · [Architecture](#architecture) · [AI stack](#ai-stack) · [How it compares](#how-it-compares) · [Integrations](#integrations) · [Install anywhere](#install-anywhere) · [Related](#related) · [Contributing](#contributing)
@@ -46,6 +52,42 @@ AI Agent Permission & Access Auditor — surfaces the lethal trifecta of credent
 <div align="right"><a href="#top">↑ back to top</a></div>
 
 <a name="quick-start"></a>
+<!-- cognis:install:start -->
+## Install
+
+`aegis` is source-available (not published to PyPI) — every method below installs
+straight from GitHub. Pick whichever you prefer; the one-line scripts auto-detect
+the best tool available on your machine.
+
+**One-liner (Linux / macOS):**
+```sh
+curl -fsSL https://raw.githubusercontent.com/cognis-digital/aegis/HEAD/install.sh | sh
+```
+
+**One-liner (Windows PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/cognis-digital/aegis/HEAD/install.ps1 | iex
+```
+
+**Or install manually — any one of:**
+```sh
+pipx install "git+https://github.com/cognis-digital/aegis.git"     # isolated (recommended)
+uv tool install "git+https://github.com/cognis-digital/aegis.git"  # uv
+pip install "git+https://github.com/cognis-digital/aegis.git"      # pip
+```
+
+**From source:**
+```sh
+git clone https://github.com/cognis-digital/aegis.git
+cd aegis && pip install .
+```
+
+Then run:
+```sh
+aegis --help
+```
+<!-- cognis:install:end -->
+
 ## Quick start
 
 ```bash

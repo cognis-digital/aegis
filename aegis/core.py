@@ -14,8 +14,13 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from dataclasses import dataclass, field, asdict
-from typing import Any, Iterable
+from pathlib import Path
+from typing import Any, Iterable, Union
+
+TOOL_NAME = "aegis"
+TOOL_VERSION = "0.1.2"
 
 # The three axes of the lethal trifecta.
 CAPABILITY_AXES = ("credentials", "injection", "reach")
@@ -288,3 +293,122 @@ def _has_exec(reach_caps: dict[str, list[str]]) -> bool:
 def audit_file(path: str) -> AuditReport:
     """Convenience: load a manifest file and audit it."""
     return audit_manifest(load_manifest(path))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# High-level directory scanner (produces ScanResult)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def scan(target: Union[str, Path]) -> "Any":
+    """Scan a directory (or single file) and return a ScanResult.
+
+    Walks the target recursively, parses Python, JSON, and YAML agent
+    definitions using the framework-specific parsers, runs the detectors,
+    scores each agent, and assembles a ScanResult with composite score,
+    risk level, lethal-trifecta list, and OWASP/MITRE compliance crosswalk.
+    """
+    # Import here to avoid circular imports at module load time.
+    from aegis.models import ScanResult, Agent, Tool
+    from aegis.parsers import (
+        parse_mcp_config,
+        parse_langchain_source,
+        parse_openai_assistant_json,
+        parse_crewai_yaml,
+    )
+    from aegis.detectors import scan_python_file_for_reach
+    from aegis.scoring import score as compute_score, detect_lethal_trifecta
+
+    t0 = time.monotonic()
+    target = Path(target)
+    files_scanned = 0
+
+    # Collect agents keyed by source file so we can merge tools from multiple
+    # parsers that operate on the same file.
+    agents: list[Agent] = []
+
+    # Walk files
+    if target.is_file():
+        walk_paths = [target]
+    else:
+        walk_paths = sorted(target.rglob("*"))
+
+    for p in walk_paths:
+        if not p.is_file():
+            continue
+
+        suffix = p.suffix.lower()
+        files_scanned += 1
+
+        if suffix == ".py":
+            # Extract langchain-style @tool decorated functions and reach findings.
+            lc_tools = parse_langchain_source(p)
+            reach_findings = scan_python_file_for_reach(p)
+
+            if lc_tools or reach_findings:
+                agent = Agent(name=f"python:{p.name}", framework="langchain")
+                agent.tools.extend(lc_tools)
+                # Reach findings go on the agent directly so they appear in all_findings.
+                agent.findings.extend(reach_findings)
+                agents.append(agent)
+
+        elif suffix == ".json":
+            # Try MCP config first, then OpenAI Assistants format.
+            agent = parse_mcp_config(p)
+            if agent is None:
+                agent = parse_openai_assistant_json(p)
+            if agent is not None:
+                agents.append(agent)
+
+        elif suffix in (".yaml", ".yml"):
+            agent = parse_crewai_yaml(p)
+            if agent is not None:
+                agents.append(agent)
+
+    # Score agents, detect trifecta.
+    lethal_trifecta_present: list[str] = []
+    compliance_refs: dict[str, int] = {}
+
+    for agent in agents:
+        all_agent_findings = list(agent.findings)
+        for tool in agent.tools:
+            all_agent_findings.extend(tool.findings)
+
+        # Per-agent score.
+        s, level = compute_score(all_agent_findings)
+        agent.composite_score = s
+        agent.risk_level = level
+
+        # Trifecta detection on the agent's tools.
+        trifecta = detect_lethal_trifecta(agent.tools)
+        agent.trifecta = trifecta
+        if trifecta.get("trifecta_present"):
+            lethal_trifecta_present.append(agent.name)
+
+        # Accumulate compliance references.
+        for f in all_agent_findings:
+            for ref in (f.references or []):
+                compliance_refs[ref] = compliance_refs.get(ref, 0) + 1
+
+    # Global composite score across everything.
+    all_findings_flat = []
+    for agent in agents:
+        all_findings_flat.extend(agent.findings)
+        for tool in agent.tools:
+            all_findings_flat.extend(tool.findings)
+
+    global_score, global_level = compute_score(all_findings_flat)
+
+    elapsed_ms = int((time.monotonic() - t0) * 1000)
+
+    return ScanResult(
+        target=str(target),
+        aegis_version=TOOL_VERSION,
+        scan_duration_ms=elapsed_ms,
+        files_scanned=files_scanned,
+        agents=agents,
+        global_findings=[],
+        composite_score=global_score,
+        risk_level=global_level,
+        compliance_crosswalk=compliance_refs,
+        lethal_trifecta_present=lethal_trifecta_present,
+    )
