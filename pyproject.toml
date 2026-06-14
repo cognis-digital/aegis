@@ -48,3 +48,6 @@ target-version = "py310"
 
 [tool.hatch.build.targets.wheel]
 packages = ["aegis"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
