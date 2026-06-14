@@ -89,7 +89,10 @@ def classify_capability(capability: dict[str, Any]) -> dict[str, list[str]]:
     """Return the set of risk axes a capability touches, with matched evidence.
 
     The result maps each matched axis -> list of matched signature tokens.
+    Returns an empty dict for non-dict inputs rather than raising AttributeError.
     """
+    if not isinstance(capability, dict):
+        return {}
     name = capability.get("name") or capability.get("tool") or ""
     haystack = _normalize(
         name,
@@ -175,7 +178,10 @@ def load_manifest(path: str) -> list[dict[str, Any]]:
       { "name": ..., "capabilities": [...] }   # single agent
     """
     with open(path, "r", encoding="utf-8") as fh:
-        data = json.load(fh)
+        raw = fh.read()
+    if not raw.strip():
+        raise ValueError("manifest file is empty")
+    data = json.loads(raw)
     return _coerce_agents(data)
 
 
@@ -190,7 +196,9 @@ def _coerce_agents(data: Any) -> list[dict[str, Any]]:
         raise ValueError("manifest must be an object or a list of agents")
     if not isinstance(agents, list):
         raise ValueError("'agents' must be a list")
-    return agents
+    # Filter out non-dict entries (null, string, number) so downstream code
+    # always receives well-typed agent dicts.
+    return [entry for entry in agents if isinstance(entry, dict)]
 
 
 def _capabilities_of(agent: dict[str, Any]) -> list[dict[str, Any]]:
@@ -200,6 +208,10 @@ def _capabilities_of(agent: dict[str, Any]) -> list[dict[str, Any]]:
         or agent.get("permissions")
         or []
     )
+    # Guard: caps must be list-like; a plain string or non-collection is treated
+    # as empty so downstream code never sees unexpected types.
+    if not isinstance(caps, (list, tuple)):
+        caps = []
     out: list[dict[str, Any]] = []
     for c in caps:
         if isinstance(c, str):
@@ -213,6 +225,8 @@ def audit_manifest(agents: Iterable[dict[str, Any]]) -> AuditReport:
     """Audit a collection of agent definitions for the lethal trifecta."""
     report = AuditReport()
     for agent in agents:
+        if not isinstance(agent, dict):
+            continue
         report.agents_scanned += 1
         agent_name = agent.get("name") or agent.get("id") or "unnamed-agent"
         caps = _capabilities_of(agent)
@@ -320,6 +334,10 @@ def scan(target: Union[str, Path]) -> "Any":
 
     t0 = time.monotonic()
     target = Path(target)
+
+    if not target.exists():
+        raise ValueError(f"scan target does not exist: {target}")
+
     files_scanned = 0
 
     # Collect agents keyed by source file so we can merge tools from multiple
@@ -333,36 +351,43 @@ def scan(target: Union[str, Path]) -> "Any":
         walk_paths = sorted(target.rglob("*"))
 
     for p in walk_paths:
-        if not p.is_file():
-            continue
+        try:
+            if not p.is_file():
+                continue
+        except OSError:
+            continue  # broken symlink or permission error on stat; skip
 
         suffix = p.suffix.lower()
         files_scanned += 1
 
-        if suffix == ".py":
-            # Extract langchain-style @tool decorated functions and reach findings.
-            lc_tools = parse_langchain_source(p)
-            reach_findings = scan_python_file_for_reach(p)
+        try:
+            if suffix == ".py":
+                # Extract langchain-style @tool decorated functions and reach findings.
+                lc_tools = parse_langchain_source(p)
+                reach_findings = scan_python_file_for_reach(p)
 
-            if lc_tools or reach_findings:
-                agent = Agent(name=f"python:{p.name}", framework="langchain")
-                agent.tools.extend(lc_tools)
-                # Reach findings go on the agent directly so they appear in all_findings.
-                agent.findings.extend(reach_findings)
-                agents.append(agent)
+                if lc_tools or reach_findings:
+                    agent = Agent(name=f"python:{p.name}", framework="langchain")
+                    agent.tools.extend(lc_tools)
+                    # Reach findings go on the agent directly so they appear in all_findings.
+                    agent.findings.extend(reach_findings)
+                    agents.append(agent)
 
-        elif suffix == ".json":
-            # Try MCP config first, then OpenAI Assistants format.
-            agent = parse_mcp_config(p)
-            if agent is None:
-                agent = parse_openai_assistant_json(p)
-            if agent is not None:
-                agents.append(agent)
+            elif suffix == ".json":
+                # Try MCP config first, then OpenAI Assistants format.
+                agent = parse_mcp_config(p)
+                if agent is None:
+                    agent = parse_openai_assistant_json(p)
+                if agent is not None:
+                    agents.append(agent)
 
-        elif suffix in (".yaml", ".yml"):
-            agent = parse_crewai_yaml(p)
-            if agent is not None:
-                agents.append(agent)
+            elif suffix in (".yaml", ".yml"):
+                agent = parse_crewai_yaml(p)
+                if agent is not None:
+                    agents.append(agent)
+        except Exception:  # noqa: BLE001
+            # A single unreadable/corrupt file must not abort the whole scan.
+            continue
 
     # Score agents, detect trifecta.
     lethal_trifecta_present: list[str] = []

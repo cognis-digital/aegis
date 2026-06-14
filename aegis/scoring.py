@@ -20,11 +20,18 @@ RISK_LEVELS = [
 
 
 def score(findings: list[Finding]) -> tuple[float, str]:
-    """Compute composite score (0-100) and risk level from findings list."""
+    """Compute composite score (0-100) and risk level from findings list.
+
+    Unknown severity values are treated as weight 0 (ignored) rather than
+    raising a KeyError, so malformed findings never abort a scan.
+    """
     if not findings:
         return 0.0, "Minimal"
 
-    raw = sum(f.weight * SEVERITY_MULTIPLIER[f.severity] for f in findings)
+    raw = sum(
+        f.weight * SEVERITY_MULTIPLIER.get(f.severity, 0.0)
+        for f in findings
+    )
     norm = min(100.0, raw * 10)
 
     for lo, hi, name in RISK_LEVELS:
@@ -35,7 +42,7 @@ def score(findings: list[Finding]) -> tuple[float, str]:
 
 def detect_lethal_trifecta(tools: list) -> dict:
     """
-    Detects Simon Willison's "lethal trifecta":
+    Detects the lethal trifecta:
     private data access + untrusted content + external communication.
     """
     has_private_data = False
@@ -50,7 +57,7 @@ def detect_lethal_trifecta(tools: list) -> dict:
                            "send_message", "notify", "tweet", "slack"]
 
     for tool in tools:
-        name = tool.name.lower()
+        name = (tool.name or "").lower()
         desc = (tool.description or "").lower()
         combined = name + " " + desc
 

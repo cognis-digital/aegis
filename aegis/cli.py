@@ -84,8 +84,17 @@ def main(argv=None) -> int:
     except FileNotFoundError:
         print(f"aegis: manifest not found: {args.manifest}", file=sys.stderr)
         return 2
+    except PermissionError as exc:
+        print(f"aegis: permission denied reading manifest: {exc}", file=sys.stderr)
+        return 2
+    except IsADirectoryError:
+        print(f"aegis: manifest path is a directory, not a file: {args.manifest}", file=sys.stderr)
+        return 2
     except (ValueError, json.JSONDecodeError) as exc:
         print(f"aegis: invalid manifest: {exc}", file=sys.stderr)
+        return 2
+    except Exception as exc:  # noqa: BLE001
+        print(f"aegis: unexpected error: {exc}", file=sys.stderr)
         return 2
 
     if args.format == "json":
