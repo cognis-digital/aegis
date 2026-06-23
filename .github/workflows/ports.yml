@@ -1,0 +1,85 @@
+name: ports
+# Build & smoke-test every language port of the AEGIS trifecta auditor.
+# Each port mirrors the primary `aegis audit <manifest.json>` command and is
+# verified against the bundled demo manifests (offline, no network).
+on:
+  push:
+    paths:
+      - "ports/**"
+      - "demos/**"
+      - ".github/workflows/ports.yml"
+  pull_request:
+    paths:
+      - "ports/**"
+      - "demos/**"
+      - ".github/workflows/ports.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ports/go
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.21"
+      - run: go vet ./...
+      - run: go test -v ./...
+      - run: go build -o aegis-go .
+      - name: Smoke run (expect exit 1 on the vulnerable demo)
+        run: |
+          if ./aegis-go --format json ../../demos/01-basic/agents.json; then
+            echo "expected non-zero exit on critical findings" && exit 1
+          fi
+
+  rust:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ports/rust
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release
+      - run: cargo test
+      - name: Smoke run (expect exit 1 on the vulnerable demo)
+        run: |
+          if ./target/release/aegis --format json ../../demos/01-basic/agents.json; then
+            echo "expected non-zero exit on critical findings" && exit 1
+          fi
+
+  javascript:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ports/javascript
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: node --test
+      - name: Smoke run (expect exit 1 on the vulnerable demo)
+        run: |
+          if node index.js --format json ../../demos/01-basic/agents.json; then
+            echo "expected non-zero exit on critical findings" && exit 1
+          fi
+
+  shell:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ports/shell
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+      - name: ShellCheck
+        run: sudo apt-get install -y shellcheck && shellcheck -S warning aegis.sh test.sh || true
+      - run: sh test.sh

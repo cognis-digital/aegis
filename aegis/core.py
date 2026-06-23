@@ -14,8 +14,33 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from dataclasses import dataclass, field, asdict
-from typing import Any, Iterable
+from pathlib import Path
+from typing import Any, Iterable, TYPE_CHECKING
+
+if TYPE_CHECKING:  # avoids a runtime import cycle (models -> core)
+    from aegis.models import Finding, ScanResult
+
+# ── Tool identity ────────────────────────────────────────────────────────────
+# Read from the VERSION file at the repo root when available so the packaged
+# wheel, the CLI, and the SARIF/HTML reports all report a single version.
+TOOL_NAME = "aegis"
+
+
+def _read_version() -> str:
+    for parent in (Path(__file__).resolve().parent, Path(__file__).resolve().parent.parent):
+        vf = parent / "VERSION"
+        try:
+            text = vf.read_text(encoding="utf-8").strip()
+            if text:
+                return text
+        except OSError:
+            continue
+    return "0.1.2"
+
+
+TOOL_VERSION = _read_version()
 
 # The three axes of the lethal trifecta.
 CAPABILITY_AXES = ("credentials", "injection", "reach")
@@ -288,3 +313,198 @@ def _has_exec(reach_caps: dict[str, list[str]]) -> bool:
 def audit_file(path: str) -> AuditReport:
     """Convenience: load a manifest file and audit it."""
     return audit_manifest(load_manifest(path))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Filesystem scan engine
+#
+# `audit_*` above is the manifest engine (one JSON file -> trifecta findings).
+# `scan()` below is the *project* engine: it walks a directory tree, dispatches
+# each file to the right framework parser (MCP / LangChain / OpenAI-Assistant /
+# CrewAI), runs the static detectors (injection / secret / reach-AST), computes
+# a deterministic composite score, and detects Simon Willison's lethal trifecta
+# per discovered agent. It returns a rich `ScanResult` that the exporters render
+# to console / JSON / SARIF / HTML / Markdown.
+#
+# Strictly passive and offline: read-only file access, no network, no execution
+# of scanned code (the reach analyzer parses the AST, it never runs it).
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Files we never descend into — keeps a scan fast and avoids vendored noise.
+_SKIP_DIRS = {
+    ".git", ".hg", ".svn", "node_modules", "__pycache__", ".venv", "venv",
+    ".mypy_cache", ".pytest_cache", ".ruff_cache", "dist", "build", ".tox",
+    ".idea", ".vscode", "site-packages", ".cache",
+}
+
+# Map every reference a finding cites onto the compliance framework controls it
+# supports, so a scan doubles as audit evidence.
+_COMPLIANCE_CROSSWALK: dict[str, tuple[str, ...]] = {
+    "OWASP LLM01": ("OWASP LLM Top 10 — LLM01 Prompt Injection",),
+    "OWASP LLM02": ("OWASP LLM Top 10 — LLM02 Sensitive Information Disclosure",),
+    "OWASP LLM06": ("OWASP LLM Top 10 — LLM06 Excessive Agency",),
+    "CWE-78": ("CWE-78 OS Command Injection", "NIST SP 800-53 SI-10"),
+    "CWE-95": ("CWE-95 Eval Injection",),
+    "CWE-502": ("CWE-502 Deserialization of Untrusted Data",),
+    "CWE-798": ("CWE-798 Use of Hard-coded Credentials", "NIST SP 800-53 IA-5"),
+    "MITRE ATLAS AML.T0051": ("MITRE ATLAS AML.T0051 LLM Prompt Injection",),
+}
+
+_MAX_FILE_BYTES = 2_000_000  # skip pathologically large blobs
+
+
+def _iter_files(root: Path):
+    """Yield candidate files under root, skipping noise/vendor directories."""
+    if root.is_file():
+        yield root
+        return
+    for p in sorted(root.rglob("*")):
+        if p.is_dir():
+            continue
+        if any(part in _SKIP_DIRS for part in p.parts):
+            continue
+        yield p
+
+
+def _looks_like(path: Path) -> str:
+    """Classify a file by name/extension to pick a parser. Cheap, no I/O."""
+    name = path.name.lower()
+    if name in ("mcp.json", "claude_desktop_config.json") or name.endswith(".mcp.json"):
+        return "mcp"
+    if path.suffix == ".json":
+        return "json"  # could be MCP, OpenAI assistant, or an aegis manifest
+    if path.suffix == ".py":
+        return "python"
+    if path.suffix in (".yaml", ".yml"):
+        return "yaml"
+    return "other"
+
+
+def scan(target, *, follow_symlinks: bool = False) -> "ScanResult":
+    """Statically audit a directory (or single file) for agent-security risk.
+
+    Read-only and offline. Returns a populated :class:`ScanResult`.
+    """
+    # Imports are local to keep the manifest engine importable even if the
+    # richer model/detector stack is ever stripped from a minimal build.
+    from aegis.models import Agent, ScanResult  # noqa: WPS433
+    from aegis import detectors as _det
+    from aegis import parsers as _par
+    from aegis import scoring as _sc
+
+    root = Path(target)
+    started = time.perf_counter()
+    result = ScanResult(target=str(root), aegis_version=TOOL_VERSION)
+
+    if not root.exists():
+        raise FileNotFoundError(f"scan target not found: {root}")
+
+    files_scanned = 0
+    for path in _iter_files(root):
+        try:
+            if path.stat().st_size > _MAX_FILE_BYTES:
+                continue
+        except OSError:
+            continue
+        kind = _looks_like(path)
+        if kind == "other":
+            continue
+        files_scanned += 1
+
+        if kind in ("mcp", "json"):
+            agent = _par.parse_mcp_config(path)
+            if agent is None:
+                agent = _par.parse_openai_assistant_json(path)
+            if agent is not None:
+                result.agents.append(agent)
+                continue
+            # An aegis-style capability manifest? Fold its findings in globally.
+            try:
+                rep = audit_file(str(path))
+            except (ValueError, json.JSONDecodeError, OSError):
+                rep = None
+            if rep is not None and rep.findings:
+                for f in rep.findings:
+                    result.global_findings.append(
+                        _trifecta_finding_to_model(f, str(path))
+                    )
+        elif kind == "python":
+            tools = _par.parse_langchain_source(path)
+            result.global_findings.extend(_det.scan_python_file_for_reach(path))
+            if tools:
+                agent = Agent(name=f"python:{path.name}", framework="langchain")
+                agent.tools.extend(tools)
+                result.agents.append(agent)
+        elif kind == "yaml":
+            agent = _par.parse_crewai_yaml(path)
+            if agent is not None:
+                result.agents.append(agent)
+
+    # Per-agent trifecta detection + scoring.
+    trifecta_agents: list[str] = []
+    for agent in result.agents:
+        agent.trifecta = _sc.detect_lethal_trifecta(agent.tools)
+        if agent.trifecta.get("trifecta_present"):
+            trifecta_agents.append(agent.name)
+            agent.findings.append(_trifecta_model_finding(agent.name))
+        agent_findings = list(agent.findings)
+        for t in agent.tools:
+            agent_findings.extend(t.findings)
+        agent.composite_score, agent.risk_level = _sc.score(agent_findings)
+
+    result.lethal_trifecta_present = trifecta_agents
+    result.composite_score, result.risk_level = _sc.score(result.all_findings())
+    result.compliance_crosswalk = _build_crosswalk(result.all_findings())
+    result.files_scanned = files_scanned
+    result.scan_duration_ms = int((time.perf_counter() - started) * 1000)
+    return result
+
+
+def _trifecta_model_finding(agent_name: str):
+    """Build a ScanResult-model Finding announcing a lethal trifecta agent."""
+    from aegis.models import Finding  # noqa: WPS433
+    return Finding(
+        id="AEG-TRIFECTA-001",
+        severity="critical",
+        weight=3.0,
+        title="Lethal trifecta: private data + untrusted content + external comms",
+        description=(
+            f"Agent `{agent_name}` can access private data, ingest untrusted "
+            "content, AND communicate externally. A single prompt injection can "
+            "exfiltrate data end-to-end."
+        ),
+        location=agent_name,
+        remediation=(
+            "Break the trifecta by removing one axis: sandbox outbound reach, "
+            "strip private-data access, or quarantine untrusted ingestion."
+        ),
+        references=["OWASP LLM06", "OWASP LLM01"],
+        category="lethal-trifecta",
+    )
+
+
+def _trifecta_finding_to_model(f: "Finding", location: str):
+    """Convert a manifest-engine `Finding` into a ScanResult-model `Finding`."""
+    from aegis.models import Finding as ModelFinding  # noqa: WPS433
+    weight = {"critical": 3.0, "high": 2.0, "medium": 1.0, "low": 0.5}.get(f.severity, 1.0)
+    return ModelFinding(
+        id="AEG-MANIFEST-001",
+        severity=f.severity,
+        weight=weight,
+        title=f.title,
+        description=f"{f.agent}: {', '.join(f.axes)}",
+        location=location,
+        remediation=f.detail,
+        references=["OWASP LLM06"],
+        category="lethal-trifecta",
+    )
+
+
+def _build_crosswalk(findings) -> dict[str, int]:
+    """Count findings per compliance control via their cited references."""
+    counts: dict[str, int] = {}
+    for f in findings:
+        for ref in getattr(f, "references", []) or []:
+            for control in _COMPLIANCE_CROSSWALK.get(ref, (ref,)):
+                counts[control] = counts.get(control, 0) + 1
+    return counts

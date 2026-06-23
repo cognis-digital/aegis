@@ -7,7 +7,7 @@ import json
 import sys
 
 from . import TOOL_NAME, TOOL_VERSION
-from .core import audit_file, AuditReport
+from .core import audit_file, scan, AuditReport
 
 _SEV_LABEL = {
     "critical": "CRIT",
@@ -15,6 +15,9 @@ _SEV_LABEL = {
     "medium": "MED ",
     "low": "LOW ",
 }
+
+# Severity ranking for the --fail-on CI gate (higher = worse).
+_SEV_RANK = {"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
 
 
 def _render_table(report: AuditReport) -> str:
@@ -68,17 +71,34 @@ def build_parser() -> argparse.ArgumentParser:
         default="table",
         help="Output format (default: table).",
     )
+
+    scan_p = sub.add_parser(
+        "scan",
+        help="Scan a project directory (MCP/LangChain/OpenAI/CrewAI) for risk.",
+        description=(
+            "Walk a directory and statically audit every discovered agent "
+            "config and source file for prompt injection, hard-coded secrets, "
+            "shell/eval reach, and the lethal trifecta. Read-only and offline."
+        ),
+    )
+    scan_p.add_argument("target", nargs="?", default=".", help="Directory or file to scan (default: .).")
+    scan_p.add_argument(
+        "--format",
+        choices=("table", "console", "json", "sarif", "html", "markdown"),
+        default="console",
+        help="Output format (default: console).",
+    )
+    scan_p.add_argument(
+        "--fail-on",
+        choices=("critical", "high", "medium", "low", "none"),
+        default="high",
+        help="Exit non-zero if any finding at/above this severity is present (default: high).",
+    )
+    scan_p.add_argument("-o", "--output", help="Write report to this file instead of stdout.")
     return parser
 
 
-def main(argv=None) -> int:
-    parser = build_parser()
-    args = parser.parse_args(argv)
-
-    if args.command != "audit":
-        parser.print_help()
-        return 0
-
+def _run_audit(args) -> int:
     try:
         report = audit_file(args.manifest)
     except FileNotFoundError:
@@ -97,6 +117,52 @@ def main(argv=None) -> int:
     # gate CI pipelines.
     if any(f.severity in ("critical", "high") for f in report.findings):
         return 1
+    return 0
+
+
+def _run_scan(args) -> int:
+    from .exporters import to_console, to_json, to_sarif, to_html, to_markdown
+
+    try:
+        result = scan(args.target)
+    except FileNotFoundError:
+        print(f"aegis: scan target not found: {args.target}", file=sys.stderr)
+        return 2
+
+    renderers = {
+        "console": to_console,
+        "table": to_console,
+        "json": to_json,
+        "sarif": to_sarif,
+        "html": to_html,
+        "markdown": to_markdown,
+    }
+    rendered = renderers[args.format](result)
+
+    if args.output:
+        with open(args.output, "w", encoding="utf-8") as fh:
+            fh.write(rendered)
+        print(f"aegis: wrote {args.format} report -> {args.output}", file=sys.stderr)
+    else:
+        print(rendered)
+
+    if args.fail_on == "none":
+        return 0
+    threshold = _SEV_RANK[args.fail_on]
+    if any(_SEV_RANK.get(f.severity, 0) >= threshold for f in result.all_findings()):
+        return 1
+    return 0
+
+
+def main(argv=None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    if args.command == "audit":
+        return _run_audit(args)
+    if args.command == "scan":
+        return _run_scan(args)
+    parser.print_help()
     return 0
 
 
