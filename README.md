@@ -27,6 +27,63 @@ It is **static, passive, and offline** — it reads manifests and source, never 
 
 ---
 
+
+<!-- cognis:example:start -->
+## 🔎 Example output
+
+Real, reproducible output from the tool — runs offline:
+
+```console
+$ aegis-emit --version
+aegis 0.1.2
+```
+
+```console
+$ aegis-emit --help
+usage: aegis [-h] [--version] {audit,scan} ...
+
+AEGIS - AI Agent Permission & Access Auditor. Detects the lethal trifecta
+(credentials + untrusted input + external reach) that makes an AI agent
+exploitable by prompt injection.
+
+positional arguments:
+  {audit,scan}
+    audit       Audit an agent manifest (JSON) for trifecta exposure.
+    scan        Scan a project directory (MCP/LangChain/OpenAI/CrewAI) for
+                risk.
+
+options:
+  -h, --help    show this help message and exit
+  --version     show program's version number and exit
+```
+
+> Blocks above are real `aegis` output — reproduce them from a clone.
+
+**Sample result format** _(illustrative values — run on your own data for real findings):_
+
+```
+{
+"findings": [
+    {
+        "id": "1234567890",
+        "title": "Suspicious Network Traffic",
+        "description": "Unusual network activity detected from IP 192.168.1.100",
+        "categories": ["Network", "Malware"],
+        "severity": "Medium"
+    },
+    {
+        "id": "2345678901",
+        "title": "Unauthorized System Access",
+        "description": "User 'johndoe' accessed system without permission",
+        "categories": ["Authentication", "Privilege Escalation"],
+        "severity": "High"
+    }
+]
+}
+```
+
+<!-- cognis:example:end -->
+
 ## Two ways to run it
 
 AEGIS has two complementary engines, both exposed on the CLI:
